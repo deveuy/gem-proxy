@@ -9,9 +9,10 @@ export default async function handler(request) {
 
   try {
     const url = new URL(request.url);
-    const targetUrl = `https://generativelanguage.googleapis.com${url.pathname}${url.search}`;
+    
+    // ЖЕСТКО УКАЗЫВАЕМ ПРАВИЛЬНЫЙ ЭНДПОИНТ GEMINI (Вместо url.pathname)
+    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent${url.search}`;
 
-    // Безопасное чтение тела запроса
     let bodyText = "";
     try {
       bodyText = await request.text();
@@ -19,7 +20,7 @@ export default async function handler(request) {
       bodyText = "{}";
     }
 
-    // Пересылаем запрос в Google Gemini
+    // Отправляем запрос в Google
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
@@ -28,7 +29,15 @@ export default async function handler(request) {
       body: bodyText,
     });
 
-    const data = await response.json();
+    // Читаем сырой текст ответа от Google (чтобы не падать, если там не JSON)
+    const responseText = await response.text();
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      data = { error: "Google returned non-JSON response: " + responseText };
+    }
 
     return new Response(JSON.stringify(data), {
       status: response.status,
@@ -36,7 +45,6 @@ export default async function handler(request) {
     });
 
   } catch (error) {
-    // Если упадет, мы увидим КТO именно упал
     return new Response(JSON.stringify({ error: "Proxy Error: " + error.message }), { status: 500 });
   }
 }
